@@ -1,183 +1,410 @@
 <template>
-  <div class="relative h-[600px] overflow-hidden rounded-lg bg-gradient-to-b from-blue-400 via-sky-300 to-green-300">
-    <!-- Battle message box in center -->
-    <div class="absolute top-1/4 left-0 right-0 flex justify-center z-10">
-      <div v-if="battleMessage" class="bg-white px-8 py-4 rounded-3xl shadow-lg text-center max-w-md animate-fadeIn">
-        <p class="font-medium text-lg">{{ battleMessage }}</p>
-      </div>
-    </div>
-    
-    <!-- Battle arena with properly positioned Pokémon -->
-    <!-- Player Pokémon (bottom left) -->
-    <div class="absolute bottom-48 left-10">
-      <!-- Player platform -->
-      <div class="absolute bottom-0 left-0 w-64 h-16 bg-gray-400 bg-opacity-50 rounded-full transform -translate-x-1/4"></div>
-      
-      <img
-        v-if="playerPokemon?.sprites?.back_default"
-        :src="playerPokemon.sprites.back_default"
-        :alt="playerPokemon.name"
-        class="h-32 transform scale-150 relative z-10"
-        :class="{ 'animate-shake': playerTakingDamage }"
-      />
-    </div>
-    
-    <!-- Player HP info card -->
-    <div class="absolute top-[36%] left-8 w-60 bg-white rounded-lg p-2 shadow-md">
-      <div class="flex justify-between items-center">
-        <span class="font-bold capitalize">{{ playerPokemon?.name || "Charmander" }}</span>
-        <span class="text-sm">Lv{{ playerLevel }}</span>
-      </div>
-      <div class="mt-1">
-        <div class="flex items-center">
-          <span class="text-sm font-medium mr-1">HP</span>
-          <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="h-2 rounded-full bg-green-500 transition-all duration-500"
-                :style="{ width: playerHealth + '%' }"></div>
+  <div class="fixed inset-0 z-50 bg-green-100 bg-opacity-50 overflow-hidden">
+    <!-- Mobile full screen battle environment -->
+    <div
+      class="sm:hidden fixed inset-0"
+      style="
+        background-image: linear-gradient(
+          to bottom,
+          #b8f4b8 0%,
+          #b8f4b8 50%,
+          #a0e8a0 100%
+        );
+      "
+    >
+      <!-- Battle field for mobile -->
+      <div class="absolute inset-0 pt-16 pb-32 px-4">
+        <!-- Opponent side (right) -->
+        <div class="relative h-1/2 mb-4">
+          <!-- Opponent info box - GBA style -->
+          <div
+            class="absolute top-0 right-6 w-48 sm:w-56 bg-cream border-2 border-black rounded-r-md"
+          >
+            <div class="flex justify-between items-center p-1 pl-2">
+              <div class="font-bold uppercase text-sm">
+                {{ opponentPokemon?.name }}
+              </div>
+              <div class="text-xs font-medium">Lv{{ opponentLevel }}</div>
+            </div>
+            <div class="p-1 pl-2 pr-2">
+              <div class="flex items-center gap-1">
+                <span class="text-xs font-bold">HP</span>
+                <div class="flex-1 h-2.5 bg-gray-300 border border-gray-700">
+                  <div
+                    class="h-1.5 mt-px ml-px"
+                    :class="[healthBarColor(opponentHealth)]"
+                    :style="{ width: `calc(${opponentHealth}% - 2px)` }"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Opponent platform - GBA style - Raised position -->
+          <div
+            class="absolute right-8 w-32 h-16 bg-green-300 rounded-full shadow-inner border-2 border-green-400"
+            style="bottom: 9rem;"
+          ></div>
+
+          <!-- Opponent Pokémon - Raised position and larger -->
+          <div class="absolute right-16" style="bottom: 9rem;">
+            <img
+              v-if="opponentPokemon?.sprites?.front_default"
+              :src="opponentPokemon.sprites.front_default"
+              :alt="opponentPokemon.name"
+              class="h-28 sm:h-32 object-contain"
+              :class="{ 'animate-shake': opponentTakingDamage }"
+            />
           </div>
         </div>
-        <div class="text-right text-sm">
-          {{ Math.ceil(playerCurrentHP) }}/{{ playerMaxHP }}
-        </div>
-      </div>
-    </div>
-    
-    <!-- Opponent Pokémon (top right) -->
-    <div class="absolute top-32 right-12">
-      <!-- Enemy platform -->
-      <div class="absolute bottom-0 right-0 w-64 h-16 bg-gray-400 bg-opacity-50 rounded-full transform translate-x-1/4"></div>
-      
-      <img
-        v-if="opponentPokemon?.sprites?.front_default"
-        :src="opponentPokemon.sprites.front_default"
-        :alt="opponentPokemon.name"
-        class="h-28 transform scale-150 relative z-10"
-        :class="{ 'animate-shake': opponentTakingDamage }"
-      />
-    </div>
-    
-    <!-- Opponent HP info card -->
-    <div class="absolute top-8 right-8 w-60 bg-white rounded-lg p-2 shadow-md">
-      <div class="flex justify-between items-center">
-        <span class="font-bold capitalize">{{ opponentPokemon?.name || "Pikachu" }}</span>
-        <span class="text-sm">Lv{{ opponentLevel }}</span>
-      </div>
-      <div class="mt-1">
-        <div class="flex items-center">
-          <span class="text-sm font-medium mr-1">HP</span>
-          <div class="w-full bg-gray-200 rounded-full h-2">
-            <div class="h-2 rounded-full bg-green-500 transition-all duration-500"
-                :style="{ width: opponentHealth + '%' }"></div>
+
+        <!-- Player side (left) -->
+        <div class="relative h-1/2">
+          <!-- Player info box - GBA style -->
+          <div
+            class="absolute top-6 left-2 w-56 sm:w-64 bg-cream border-2 border-black rounded-r-md"
+          >
+            <div class="flex justify-between items-center p-1 pl-2">
+              <div class="font-bold uppercase text-sm">
+                {{ playerPokemon?.name }}
+              </div>
+              <div class="text-xs font-medium">Lv{{ playerLevel }}</div>
+            </div>
+            <div class="p-1 pl-2 pr-2">
+              <div class="flex items-center gap-1">
+                <span class="text-xs font-bold">HP</span>
+                <div class="flex-1 h-2.5 bg-gray-300 border border-gray-700">
+                  <div
+                    class="h-1.5 mt-px ml-px"
+                    :class="[healthBarColor(playerHealth)]"
+                    :style="{ width: `calc(${playerHealth}% - 2px)` }"
+                  ></div>
+                </div>
+              </div>
+              <div class="mt-0.5 flex justify-between items-center">
+                <div class="text-xs font-medium">
+                  {{ Math.ceil(playerCurrentHP) }}/{{ playerMaxHP }}
+                </div>
+                <div class="text-xs font-medium">
+                  <span v-if="playerLevel >= 100">EXP</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Player platform - GBA style - Raised position -->
+          <div
+            class="absolute left-8 w-32 h-16 bg-green-300 rounded-full shadow-inner border-2 border-green-400"
+            style="bottom: 9rem;"
+          ></div>
+
+          <!-- Player Pokémon - Raised position and larger -->
+          <div class="absolute left-16" style="bottom: 9rem;">
+            <img
+              v-if="playerPokemon?.sprites?.back_default"
+              :src="playerPokemon.sprites.back_default"
+              :alt="playerPokemon.name"
+              class="h-28 sm:h-32 object-contain"
+              :class="{ 'animate-shake': playerTakingDamage }"
+            />
           </div>
         </div>
-        <div class="text-right text-sm">
-          {{ Math.ceil(opponentCurrentHP) }}/{{ opponentMaxHP }}
+      </div>
+    </div>
+
+    <!-- Desktop windowed battle environment -->
+    <div class="hidden sm:flex items-center justify-center h-full w-full">
+      <div
+        class="relative w-[800px] h-[600px] rounded-lg overflow-hidden shadow-2xl border-4 border-gray-800"
+        style="
+          background-image: linear-gradient(
+            to bottom,
+            #b8f4b8 0%,
+            #b8f4b8 50%,
+            #a0e8a0 100%
+          );
+        "
+      >
+        <!-- Battle field for desktop -->
+        <div class="absolute inset-0 pt-16 pb-32 px-4">
+          <!-- Opponent side (right) -->
+          <div class="relative h-2/3 mb-4">
+            <!-- Opponent info box - GBA style -->
+            <div
+              class="absolute right-8 w-56 bg-cream border-2 border-black rounded-r-md"
+              style="top: -2rem;"
+            >
+              <div class="flex justify-between items-center p-1 pl-2">
+                <div class="font-bold uppercase text-sm">
+                  {{ opponentPokemon?.name }}
+                </div>
+                <div class="text-xs font-medium">Lv{{ opponentLevel }}</div>
+              </div>
+              <div class="p-1 pl-2 pr-2">
+                <div class="flex items-center gap-1">
+                  <span class="text-xs font-bold">HP</span>
+                  <div class="flex-1 h-2.5 bg-gray-300 border border-gray-700">
+                    <div
+                      class="h-1.5 mt-px ml-px"
+                      :class="[healthBarColor(opponentHealth)]"
+                      :style="{ width: `calc(${opponentHealth}% - 2px)` }"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Opponent platform - GBA style - Raised position -->
+            <div
+              class="absolute bottom-24 right-12 w-40 h-20 bg-green-300 rounded-full shadow-inner border-2 border-green-400"
+            ></div>
+
+            <!-- Opponent Pokémon - Raised position and larger -->
+            <div class="absolute bottom-28" style="right:4rem">
+              <img
+                v-if="opponentPokemon?.sprites?.front_default"
+                :src="opponentPokemon.sprites.front_default"
+                :alt="opponentPokemon.name"
+                class="h-36 object-contain"
+                :class="{ 'animate-shake': opponentTakingDamage }"
+              />
+            </div>
+          </div>
+
+          <!-- Player side (left) -->
+          <div class="relative h-2/3">
+            <!-- Player info box - GBA style -->
+            <div
+              class="absolute left-8 w-64 bg-cream border-2 border-black rounded-r-md"
+              style="top: -55px;"
+            >
+              <div class="flex justify-between items-center p-1 pl-2">
+                <div class="font-bold uppercase text-sm">
+                  {{ playerPokemon?.name }}
+                </div>
+                <div class="text-xs font-medium">Lv{{ playerLevel }}</div>
+              </div>
+              <div class="p-1 pl-2 pr-2">
+                <div class="flex items-center gap-1">
+                  <span class="text-xs font-bold">HP</span>
+                  <div class="flex-1 h-2.5 bg-gray-300 border border-gray-700">
+                    <div
+                      class="h-1.5 mt-px ml-px"
+                      :class="[healthBarColor(playerHealth)]"
+                      :style="{ width: `calc(${playerHealth}% - 2px)` }"
+                    ></div>
+                  </div>
+                </div>
+                <div class="mt-0.5 flex justify-between items-center">
+                  <div class="text-xs font-medium">
+                    {{ Math.ceil(playerCurrentHP) }}/{{ playerMaxHP }}
+                  </div>
+                  <div class="text-xs font-medium">
+                    <span v-if="playerLevel >= 100">EXP</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Player platform - GBA style - Raised position -->
+            <div
+              class="absolute bottom-28 left-12 w-40 h-20 bg-green-300 rounded-full shadow-inner border-2 border-green-400"
+            ></div>
+
+            <!-- Player Pokémon - Raised position and larger -->
+            <div class="absolute bottom-32" style="left:4rem">
+              <img
+                v-if="playerPokemon?.sprites?.back_default"
+                :src="playerPokemon.sprites.back_default"
+                :alt="playerPokemon.name"
+                class="h-36 object-contain"
+                :class="{ 'animate-shake': playerTakingDamage }"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    
-    <!-- Battle controls -->
-    <div class="absolute bottom-0 left-0 right-0 overflow-hidden">
-      <!-- Main battle menu -->
-      <div v-if="battleStep === 1" class="grid grid-cols-2 gap-px">
-        <button 
+
+    <!-- Type effectiveness message -->
+    <div
+      v-if="showEffectiveness"
+      class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30"
+    >
+      <div class="bg-white px-4 py-2 rounded-lg shadow-lg animate-fadeIn">
+        <p :class="effectivenessClass">{{ effectivenessMessage }}</p>
+      </div>
+    </div>
+
+    <!-- Battle message box - GBA style -->
+    <div
+      class="absolute bottom-0 left-0 right-0 h-32 bg-red-100 border-t-4 border-red-600 sm:left-1/2 sm:right-auto sm:w-[800px] sm:transform sm:-translate-x-1/2 sm:rounded-b-lg"
+    >
+      <div class="bg-white m-2 p-3 h-24 border-2 border-black rounded">
+        <div v-if="introMessage" class="text-black text-base">
+          <p>{{ introMessage }}</p>
+          <div class="mt-2 flex justify-end">
+            <button
+              @click="dismissIntro"
+              class="text-sm font-bold px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded"
+            >
+              ▶
+            </button>
+          </div>
+        </div>
+        <p v-else-if="battleMessage" class="text-black text-base">
+          {{ battleMessage }}
+        </p>
+        <p v-else class="text-black text-base">
+          {{
+            battleStep === 1
+              ? "What will " + (playerPokemon?.name || "POOCHYENA") + " do?"
+              : battleStep === 0
+              ? "Choose a move!"
+              : battleStep === 2
+              ? "Choose an item!"
+              : "..."
+          }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Battle command menu - GBA style (overlays on message box when active) -->
+    <div
+      v-if="!battleMessage && !introMessage && battleStep === 1"
+      class="absolute bottom-0 right-0 w-1/2 h-32 sm:right-auto sm:left-1/2 sm:transform sm:translate-x-0 sm:w-[400px]"
+    >
+      <div class="grid grid-cols-2 grid-rows-2 h-full p-2">
+        <button
           @click="battleStep = 0"
-          class="py-6 px-8 text-center text-lg font-medium bg-red-100 hover:bg-red-200 transition"
+          class="font-bold text-black border-2 border-black m-1 bg-white hover:bg-gray-100 active:bg-gray-200 rounded"
         >
-          Fight
+          FIGHT
         </button>
-        <button 
+        <button
           @click="openBag"
-          class="py-6 px-8 text-center text-lg font-medium bg-blue-100 hover:bg-blue-200 transition"
+          class="font-bold text-black border-2 border-black m-1 bg-white hover:bg-gray-100 active:bg-gray-200 rounded"
           :disabled="!playerItems.length || attacking"
         >
-          Bag ({{ playerItems.length }})
+          BAG
         </button>
-        <button 
+        <button
           @click="tryToRun"
-          class="col-span-2 py-6 px-8 text-center text-lg font-medium bg-green-100 hover:bg-green-200 transition"
+          class="font-bold text-black border-2 border-black m-1 bg-white hover:bg-gray-100 active:bg-gray-200 rounded"
           :disabled="isTrainerBattle || attacking"
         >
-          Run
+          RUN
+        </button>
+        <button
+          class="font-bold text-black border-2 border-black m-1 bg-white hover:bg-gray-100 active:bg-gray-200 rounded"
+        >
+          POKéMON
         </button>
       </div>
-      
-      <!-- Fight moves menu -->
-      <div v-if="battleStep === 0" class="grid grid-cols-2 gap-px">
+    </div>
+
+    <!-- Moves menu - GBA style -->
+    <div
+      v-if="battleStep === 0"
+      class="absolute bottom-0 left-0 right-0 bg-white border-t-2 border-black sm:left-1/2 sm:right-auto sm:w-[800px] sm:transform sm:-translate-x-1/2"
+    >
+      <div class="grid grid-cols-2 gap-px">
         <button
           v-for="move in playerMoves"
           :key="move.id"
           @click="selectMove(move)"
-          class="py-2 px-6 text-left font-medium capitalize hover:opacity-90 transition"
-          :class="getMoveTypeClass(move.type)"
+          class="h-16 px-4 py-2 border-2 border-black m-1 text-left uppercase font-bold hover:bg-gray-100 active:bg-gray-200 rounded"
           :disabled="attacking || move.pp <= 0"
         >
-          <div class="font-bold text-base">{{ move.name }}</div>
-          <div class="flex justify-between w-full mt-1">
-            <span class="text-xs opacity-80">{{ move.type }}</span>
-            <span class="text-xs">PP: {{ move.pp }}/{{ move.maxPp }}</span>
+          {{ move.name }}
+          <div class="text-right text-xs mt-1">
+            PP: {{ move.pp }}/{{ move.maxPp }}
           </div>
         </button>
-        <button 
-          @click="battleStep = 1" 
-          class="col-span-2 py-4 text-center text-base font-medium bg-gray-200 hover:bg-gray-300 transition"
-        >
-          Back
-        </button>
       </div>
-      
-      <!-- Bag menu -->
-      <div v-if="battleStep === 2" class="grid grid-cols-2 gap-px">
+      <div class="flex justify-end p-2">
         <button
-          v-for="item in playerItems.slice(0, 4)"
-          :key="item.id"
-          @click="useItem(item)"
-          class="py-5 px-6 text-left bg-yellow-100 hover:bg-yellow-200 transition"
-          :disabled="attacking || item.quantity <= 0"
+          @click="battleStep = 1"
+          class="font-bold text-black border-2 border-black px-4 py-1 bg-white hover:bg-gray-100 active:bg-gray-200 rounded"
         >
-          <div class="font-bold">{{ item.name }}</div>
-          <div class="flex justify-between items-center mt-1">
-            <div class="text-xs text-gray-600">{{ item.description }}</div>
-            <div class="text-xs font-bold">x{{ item.quantity }}</div>
-          </div>
+          BACK
         </button>
-        <button 
-          @click="battleStep = 1" 
-          class="col-span-2 py-4 text-center text-base font-medium bg-gray-200 hover:bg-gray-300 transition"
-        >
-          Back
-        </button>
-      </div>
-      
-      <!-- Opponent turn indicator -->
-      <div v-if="battleStep === 3" class="p-8 text-center bg-white">
-        <div class="text-lg font-medium">
-          {{ opponentPokemon?.name || "Opponent" }} is making a move...
-        </div>
       </div>
     </div>
-    
+
+    <!-- Items menu - now matches moves menu style -->
+    <div
+      v-if="battleStep === 2"
+      class="absolute bottom-0 left-0 right-0 bg-white border-t-2 border-black sm:left-1/2 sm:right-auto sm:w-[800px] sm:transform sm:-translate-x-1/2"
+    >
+      <div class="grid grid-cols-2 gap-px">
+        <button
+          v-for="item in playerItems"
+          :key="item.id"
+          @click="useItem(item)"
+          class="h-16 px-4 py-2 border-2 border-black m-1 text-left uppercase font-bold hover:bg-gray-100 active:bg-gray-200 rounded"
+          :disabled="attacking"
+        >
+          {{ item.name }}
+          <div class="flex justify-between mt-1">
+            <span class="text-xs">{{ item.description }}</span>
+            <span class="text-xs font-medium" v-if="item.quantity"
+              >x{{ item.quantity }}</span
+            >
+          </div>
+        </button>
+      </div>
+      <div class="flex justify-end p-2">
+        <button
+          @click="battleStep = 1"
+          class="font-bold text-black border-2 border-black px-4 py-1 bg-white hover:bg-gray-100 active:bg-gray-200 rounded"
+        >
+          BACK
+        </button>
+      </div>
+    </div>
+
     <!-- Battle result overlay -->
-    <div v-if="battleComplete" class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-20">
-      <div class="bg-white p-6 rounded-xl shadow-xl max-w-sm mx-auto">
+    <div
+      v-if="battleComplete"
+      class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 z-20"
+    >
+      <div
+        class="bg-white p-5 m-4 border-4 border-black rounded max-w-sm w-full"
+      >
         <h3 class="text-xl font-bold mb-3 text-center">
-          {{ battleResult === "player" ? "Victory!" : 
-             battleResult === "capture" ? "Gotcha!" : 
-             battleResult === "run" ? "Escaped!" : "Defeat!" }}
+          {{
+            battleResult === "player"
+              ? "Victory!"
+              : battleResult === "capture"
+              ? "Gotcha!"
+              : battleResult === "run"
+              ? "Escaped!"
+              : "Defeat!"
+          }}
         </h3>
         <p class="text-center mb-4">{{ battleResultMessage }}</p>
-        
-        <div v-if="battleStats.experienceGained" class="my-4 p-3 bg-blue-100 rounded-lg">
+
+        <div
+          v-if="battleStats.experienceGained"
+          class="my-4 p-3 bg-blue-100 border-2 border-blue-300 rounded"
+        >
           <div class="text-center">
-            {{ playerPokemon?.name || "Your Pokémon" }} gained <span class="font-bold">{{ battleStats.experienceGained }} EXP</span>.
+            {{ playerPokemon?.name || "Your Pokémon" }} gained
+            <span class="font-bold">{{ battleStats.experienceGained }} EXP</span
+            >.
           </div>
-          <div v-if="battleStats.levelUp" class="font-bold text-blue-700 text-center mt-2">
+          <div
+            v-if="battleStats.levelUp"
+            class="font-bold text-blue-700 text-center mt-2"
+          >
             Level Up! Now level {{ battleStats.newLevel }}!
           </div>
         </div>
-        
-        <button @click="$emit('battle-close', battleResult, battleStats)" 
-          class="w-full py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition shadow-md">
+
+        <button
+          @click="$emit('battle-close', battleResult, battleStats)"
+          class="w-full py-2 bg-red-600 text-white font-bold border-2 border-black rounded hover:bg-red-700 active:bg-red-800"
+        >
           Continue Adventure
         </button>
       </div>
@@ -191,31 +418,60 @@ import { ref, computed, onMounted, watch } from "vue";
 const props = defineProps({
   playerPokemon: {
     type: Object,
-    default: () => ({ name: "Your Pokémon" }),
+    default: () => ({
+      name: "POOCHYENA",
+      sprites: {
+        back_default:
+          "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/261.png",
+      },
+    }),
   },
   opponentPokemon: {
     type: Object,
-    default: () => ({ name: "Wild Pokémon" }),
+    default: () => ({
+      name: "KIRLIA",
+      sprites: {
+        front_default:
+          "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/front/281.png",
+      },
+    }),
+  },
+  playerLevel: {
+    type: Number,
+    default: 13,
+  },
+  opponentLevel: {
+    type: Number,
+    default: 100,
+  },
+  isWildBattle: {
+    type: Boolean,
+    default: true,
+  },
+  playerItems: {
+    type: Array,
+    default: () => [
+      {
+        id: 1,
+        name: "Potion",
+        description: "Restores 20 HP",
+        type: "healing",
+        value: 20,
+        quantity: 3,
+      },
+      {
+        id: 2,
+        name: "Poké Ball",
+        description: "Catches wild Pokémon",
+        type: "pokeball",
+        value: 1,
+        quantity: 5,
+      },
+    ],
   },
   initialResult: {
     type: String,
     default: null,
-  },
-  isTrainerBattle: {
-    type: Boolean,
-    default: false,
-  },
-  playerLevel: {
-    type: Number,
-    default: 5,
-  },
-  opponentLevel: {
-    type: Number,
-    default: 5,
-  },
-  playerItems: {
-    type: Array,
-    default: () => [],
   },
   autoCompleteWithResult: {
     type: Boolean,
@@ -223,20 +479,24 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["battle-close", "move-selected"]);
+const emit = defineEmits([
+  "battle-close",
+  "move-selected",
+  "item-used",
+  "run-attempted",
+]);
 
 // Image loading state
 const playerImageLoaded = ref(false);
 const opponentImageLoaded = ref(false);
 
 // Battle state
-const playerHealth = ref(100);
-const opponentHealth = ref(100);
-const battleComplete = ref(false);
-const battleResult = ref(null);
-const battleStep = ref(1); // 0: Move selection, 1: Main menu, 2: Bag, 3: Opponent's turn
+const introMessage = ref("A wild Pokémon appeared!");
 const battleMessage = ref("");
+const battleStep = ref(1); // 0 = move selection, 1 = main menu, 2 = bag, 3 = opponent turn
 const attacking = ref(false);
+const battleComplete = ref(false);
+const battleResult = ref("");
 const playerTakingDamage = ref(false);
 const opponentTakingDamage = ref(false);
 const effectivenessMessage = ref("");
@@ -255,7 +515,7 @@ const battleStats = ref({
 
 // Calculate max HP based on base stats and level
 const playerMaxHP = computed(() => {
-  if (!props.playerPokemon?.stats) return 100;
+  if (!props.playerPokemon?.stats) return 20 + props.playerLevel * 4;
   const baseHP =
     props.playerPokemon.stats.find((s) => s.stat.name === "hp")?.base_stat ||
     50;
@@ -265,7 +525,7 @@ const playerMaxHP = computed(() => {
 });
 
 const opponentMaxHP = computed(() => {
-  if (!props.opponentPokemon?.stats) return 100;
+  if (!props.opponentPokemon?.stats) return 20 + props.opponentLevel * 4;
   const baseHP =
     props.opponentPokemon.stats.find((s) => s.stat.name === "hp")?.base_stat ||
     50;
@@ -279,6 +539,12 @@ const opponentMaxHP = computed(() => {
 // Current HP values
 const playerCurrentHP = ref(0);
 const opponentCurrentHP = ref(0);
+
+// Health percentages
+const playerHealth = computed(
+  () => (playerCurrentHP.value / playerMaxHP.value) * 100
+);
+const opponentHealth = ref(100);
 
 // Type effectiveness chart
 const typeEffectiveness = {
@@ -444,8 +710,28 @@ const defaultMoves = [
   },
 ];
 
-// Process player's Pokémon moves to include power and PP
+// Process player's Pokémon moves
 const playerMoves = ref([]);
+
+// Message to display at the end of battle
+const battleResultMessage = computed(() => {
+  if (battleResult.value === "player") {
+    return `Congratulations! Your ${
+      props.playerPokemon?.name || "Pokémon"
+    } defeated ${props.opponentPokemon?.name || "the opponent"}!`;
+  } else if (battleResult.value === "run") {
+    return `Got away safely!`;
+  } else if (battleResult.value === "capture") {
+    return `You caught ${props.opponentPokemon?.name || "the wild Pokémon"}!`;
+  } else {
+    return `Your ${props.playerPokemon?.name || "Pokémon"} was defeated by ${
+      props.opponentPokemon?.name || "the opponent"
+    }. Better luck next time!`;
+  }
+});
+
+// Computed properties
+const isTrainerBattle = computed(() => !props.isWildBattle);
 
 // Process and assign real moves from the Pokémon
 const processPlayerMoves = async () => {
@@ -464,7 +750,7 @@ const processPlayerMoves = async () => {
 
   for (const move of pokemonMovesList) {
     try {
-      // Try to get detailed move data from the move URL or use default data
+      // Try to get detailed move data
       const moveData = {
         id: move.id || Math.random().toString(36).substr(2, 9),
         name: move.move?.name || move.name || "Unknown Move",
@@ -501,48 +787,21 @@ const healthBarColor = (health) => {
   return "bg-red-500";
 };
 
-// Get background color based on move type
-const getMoveTypeClass = (type) => {
-  const typeColors = {
-    normal: "bg-gray-200",
-    fire: "bg-red-200 text-red-800",
-    water: "bg-blue-200 text-blue-800",
-    electric: "bg-yellow-200 text-yellow-800",
-    grass: "bg-green-200 text-green-800",
-    ice: "bg-blue-100 text-blue-800",
-    fighting: "bg-red-300 text-red-800",
-    poison: "bg-purple-200 text-purple-800",
-    ground: "bg-yellow-300 text-yellow-800",
-    flying: "bg-indigo-200 text-indigo-800",
-    psychic: "bg-pink-200 text-pink-800",
-    bug: "bg-green-300 text-green-800",
-    rock: "bg-yellow-400 text-yellow-900",
-    ghost: "bg-purple-300 text-purple-900",
-    dragon: "bg-indigo-300 text-indigo-900",
-    dark: "bg-gray-700 text-white",
-    steel: "bg-gray-400 text-gray-900",
-    fairy: "bg-pink-100 text-pink-900",
-  };
+// Get types from a Pokémon
+const getPokemonTypes = (pokemon) => {
+  if (!pokemon || !pokemon.types) return ["normal"];
 
-  return typeColors[type] || "bg-gray-200";
-};
-
-// Message to display at the end of battle
-const battleResultMessage = computed(() => {
-  if (battleResult.value === "player") {
-    return `Congratulations! Your ${
-      props.playerPokemon?.name || "Pokémon"
-    } defeated ${props.opponentPokemon?.name || "the opponent"}!`;
-  } else if (battleResult.value === "run") {
-    return `Got away safely!`;
-  } else if (battleResult.value === "capture") {
-    return `You caught ${props.opponentPokemon?.name || "the wild Pokémon"}!`;
-  } else {
-    return `Your ${props.playerPokemon?.name || "Pokémon"} was defeated by ${
-      props.opponentPokemon?.name || "the opponent"
-    }. Better luck next time!`;
+  // Handle different type formats
+  if (Array.isArray(pokemon.types) && typeof pokemon.types[0] === "string") {
+    return pokemon.types;
   }
-});
+
+  if (Array.isArray(pokemon.types) && pokemon.types[0]?.type?.name) {
+    return pokemon.types.map((t) => t.type.name);
+  }
+
+  return ["normal"];
+};
 
 // Determine move effectiveness and multiplier
 const getMoveEffectiveness = (moveType, defenderTypes) => {
@@ -570,22 +829,6 @@ const getMoveEffectiveness = (moveType, defenderTypes) => {
   }
 
   return { multiplier, message };
-};
-
-// Get types from a Pokémon
-const getPokemonTypes = (pokemon) => {
-  if (!pokemon || !pokemon.types) return ["normal"];
-
-  // Handle different type formats
-  if (Array.isArray(pokemon.types) && typeof pokemon.types[0] === "string") {
-    return pokemon.types;
-  }
-
-  if (Array.isArray(pokemon.types) && pokemon.types[0]?.type?.name) {
-    return pokemon.types.map((t) => t.type.name);
-  }
-
-  return ["normal"];
 };
 
 // Calculate damage with type effectiveness and critical hit chance
@@ -645,99 +888,31 @@ const calculateDamage = (move, attacker, defender, isPlayer) => {
   };
 };
 
-// Process a move's status effects
-const applyStatusEffect = (move) => {
-  if (!move.statusEffect) return null;
+// Methods
+function dismissIntro() {
+  introMessage.value = "";
+  battleMessage.value = ""; // Clear the battle message as well
+}
 
-  // Simple implementation for now
-  return {
-    type: move.statusEffect,
-    chance: move.statusEffectChance || 100,
-    applied: Math.random() * 100 < (move.statusEffectChance || 100),
-  };
-};
+function displayMessage(message, duration = 2000) {
+  battleMessage.value = message;
+  // Clear the message after duration
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      battleMessage.value = "";
+      resolve();
+    }, duration);
+  });
+}
 
-// Handle using an item
-const useItem = async (item) => {
+function openBag() {
   if (attacking.value) return;
-  attacking.value = true;
-
-  battleMessage.value = `Used ${item.name}!`;
-
-  await new Promise((resolve) => setTimeout(resolve, 800));
-
-  // Handle different item types
-  if (item.type === "healing") {
-    const healAmount = item.value || 20;
-    playerCurrentHP.value = Math.min(
-      playerMaxHP.value,
-      playerCurrentHP.value + healAmount
-    );
-    playerHealth.value = (playerCurrentHP.value / playerMaxHP.value) * 100;
-
-    battleMessage.value = `${
-      props.playerPokemon?.name || "Your Pokémon"
-    } restored ${healAmount} HP!`;
-
-    // Reduce item quantity
-    const itemIndex = props.playerItems.findIndex((i) => i.id === item.id);
-    if (itemIndex !== -1 && props.playerItems[itemIndex].quantity > 0) {
-      props.playerItems[itemIndex].quantity--;
-    }
-  } else if (item.type === "pokeball") {
-    // Handle capture attempt
-    if (props.isTrainerBattle) {
-      battleMessage.value = "You can't catch another Trainer's Pokémon!";
-    } else {
-      // Reduce item quantity first
-      const itemIndex = props.playerItems.findIndex((i) => i.id === item.id);
-      if (itemIndex !== -1 && props.playerItems[itemIndex].quantity > 0) {
-        props.playerItems[itemIndex].quantity--;
-      }
-
-      // Calculate catch rate - lower HP means higher chance
-      const catchRate =
-        (3 * opponentMaxHP.value - 2 * opponentCurrentHP.value) *
-        (opponentMaxHP.value > 200 ? 0.1 : 0.2);
-      const catchSuccess = Math.random() * 100 < catchRate;
-
-      battleMessage.value = "The ball is thrown...";
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      if (catchSuccess) {
-        battleMessage.value = "Gotcha! The Pokémon was caught!";
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-
-        battleResult.value = "capture";
-        battleComplete.value = true;
-        attacking.value = false;
-        return;
-      } else {
-        battleMessage.value = "Oh no! The Pokémon broke free!";
-      }
-    }
-  } else if (item.type === "status") {
-    battleMessage.value = `The ${item.name} failed to work!`;
-
-    // Reduce item quantity
-    const itemIndex = props.playerItems.findIndex((i) => i.id === item.id);
-    if (itemIndex !== -1 && props.playerItems[itemIndex].quantity > 0) {
-      props.playerItems[itemIndex].quantity--;
-    }
-  }
-
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  // After using item, opponent's turn
-  battleStep.value = 3;
-  await handleOpponentTurn();
-
-  attacking.value = false;
-};
+  battleStep.value = 2;
+}
 
 // Try to run from battle
-const tryToRun = async () => {
-  if (attacking.value) return;
+async function tryToRun() {
+  if (attacking.value || isTrainerBattle.value) return;
   attacking.value = true;
 
   battleMessage.value = "Trying to run away...";
@@ -768,19 +943,91 @@ const tryToRun = async () => {
   }
 
   attacking.value = false;
-};
+}
 
-// Open bag
-const openBag = () => {
-  battleStep.value = 2;
-};
+// Handle using an item
+async function useItem(item) {
+  if (attacking.value) return;
+  attacking.value = true;
+
+  battleMessage.value = `Used ${item.name}!`;
+
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
+  // Handle different item types
+  if (item.type === "healing" || item.effect === "heal") {
+    const healAmount = item.value || 20;
+    playerCurrentHP.value = Math.min(
+      playerMaxHP.value,
+      playerCurrentHP.value + healAmount
+    );
+
+    battleMessage.value = `${
+      props.playerPokemon?.name || "Your Pokémon"
+    } restored ${healAmount} HP!`;
+
+    // Reduce item quantity if available
+    if (item.quantity) {
+      item.quantity--;
+    }
+  } else if (item.type === "pokeball" || item.effect === "capture") {
+    // Handle capture attempt
+    if (props.isTrainerBattle) {
+      battleMessage.value = "You can't catch another Trainer's Pokémon!";
+    } else {
+      // Reduce item quantity if available
+      if (item.quantity) {
+        item.quantity--;
+      }
+
+      // Calculate catch rate - lower HP means higher chance
+      const catchRate =
+        (3 * opponentMaxHP.value - 2 * opponentCurrentHP.value) *
+        (opponentMaxHP.value > 200 ? 0.1 : 0.2);
+      const catchSuccess = Math.random() * 100 < catchRate;
+
+      battleMessage.value = "The ball is thrown...";
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      if (catchSuccess) {
+        battleMessage.value = "Gotcha! The Pokémon was caught!";
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+
+        battleResult.value = "capture";
+        battleComplete.value = true;
+        attacking.value = false;
+        return;
+      } else {
+        battleMessage.value = "Oh no! The Pokémon broke free!";
+      }
+    }
+  } else if (item.type === "status") {
+    battleMessage.value = `The ${item.name} failed to work!`;
+
+    // Reduce item quantity if available
+    if (item.quantity) {
+      item.quantity--;
+    }
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  // After using item, opponent's turn
+  battleStep.value = 3;
+  await handleOpponentTurn();
+
+  attacking.value = false;
+}
 
 // Handle player move selection
-const selectMove = async (move) => {
+async function selectMove(move) {
   if (attacking.value || battleComplete.value) return;
 
   attacking.value = true;
   battleStats.value.turns++;
+
+  // Close the move selection UI immediately
+  battleStep.value = 1;
 
   // Record move usage
   battleStats.value.movesUsed.push(move.name);
@@ -794,16 +1041,14 @@ const selectMove = async (move) => {
   // Emit move selected event
   emit("move-selected", move.name);
 
+  // Show the attack message and wait for it to complete
   battleMessage.value = `${props.playerPokemon?.name || "Your Pokémon"} used ${
     move.name
   }!`;
-
   await new Promise((resolve) => setTimeout(resolve, 800));
 
+  // Rest of your existing selectMove function...
   // Calculate damage with type effectiveness
-  const playerTypes = getPokemonTypes(props.playerPokemon);
-  const opponentTypes = getPokemonTypes(props.opponentPokemon);
-
   const { damage, critical, effectiveness } = calculateDamage(
     move,
     props.playerPokemon,
@@ -842,6 +1087,8 @@ const selectMove = async (move) => {
         : "text-blue-600";
 
     showEffectiveness.value = true;
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    showEffectiveness.value = false;
   }
 
   // Show critical hit message
@@ -896,17 +1143,14 @@ const selectMove = async (move) => {
 
   // Move to opponent's turn
   await new Promise((resolve) => setTimeout(resolve, 800));
-  battleStep.value = 3;
-  effectivenessMessage.value = "";
-  showEffectiveness.value = false;
 
   // Opponent's turn
   await handleOpponentTurn();
   attacking.value = false;
-};
+}
 
 // Handle opponent's turn
-const handleOpponentTurn = async () => {
+async function handleOpponentTurn() {
   if (battleComplete.value) return;
 
   await new Promise((resolve) => setTimeout(resolve, 800));
@@ -965,6 +1209,7 @@ const handleOpponentTurn = async () => {
     } ${selectedMove.statEffect.change < 0 ? "fell" : "rose"}!`;
     await new Promise((resolve) => setTimeout(resolve, 800));
     battleStep.value = 1; // Return to player's main menu
+    battleMessage.value = ""; // Clear message to ensure menu appears
     return;
   }
 
@@ -986,6 +1231,7 @@ const handleOpponentTurn = async () => {
 
     showEffectiveness.value = true;
     await new Promise((resolve) => setTimeout(resolve, 800));
+    showEffectiveness.value = false;
   }
 
   // Show critical hit message
@@ -1005,7 +1251,6 @@ const handleOpponentTurn = async () => {
 
     // Calculate and update HP
     playerCurrentHP.value = Math.max(0, playerCurrentHP.value - damage);
-    playerHealth.value = (playerCurrentHP.value / playerMaxHP.value) * 100;
 
     // Track damage taken for stats
     battleStats.value.damageTaken += damage;
@@ -1023,14 +1268,12 @@ const handleOpponentTurn = async () => {
 
   // Return to player's main menu
   await new Promise((resolve) => setTimeout(resolve, 800));
-  effectivenessMessage.value = "";
-  showEffectiveness.value = false;
-  battleMessage.value = "What will you do?";
+  battleMessage.value = ""; // Clear the message to ensure menu shows up
   battleStep.value = 1; // Back to main menu
-};
+}
 
 // End the battle
-const endBattle = (result) => {
+function endBattle(result) {
   battleResult.value = result;
   battleComplete.value = true;
 
@@ -1042,7 +1285,37 @@ const endBattle = (result) => {
 
     battleStats.value.experienceGained = Math.floor(baseExp * trainerBonus);
   }
-};
+}
+
+// Initialize the battle
+onMounted(async () => {
+  // Initialize HP values correctly
+  playerCurrentHP.value = playerMaxHP.value;
+  opponentCurrentHP.value = opponentMaxHP.value;
+  opponentHealth.value = 100;
+
+  // Set initial battle message
+  battleMessage.value = "A wild Pokémon appeared!";
+
+  // Process moves to ensure proper PP and typing
+  await processPlayerMoves();
+
+  // Handle auto-complete with result (for reviewing past battles)
+  if (props.initialResult && props.autoCompleteWithResult) {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    battleMessage.value = "The battle is already over!";
+
+    if (props.initialResult === "player") {
+      opponentCurrentHP.value = 0;
+      opponentHealth.value = 0;
+    } else {
+      playerCurrentHP.value = 0;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    endBattle(props.initialResult);
+  }
+});
 
 // Preload images when component mounts or when Pokémon change
 watch(
@@ -1053,11 +1326,10 @@ watch(
       // Reset battle state when Pokémon change
       playerCurrentHP.value = playerMaxHP.value;
       opponentCurrentHP.value = opponentMaxHP.value;
-      playerHealth.value = 100;
       opponentHealth.value = 100;
       battleStep.value = 1;
       battleMessage.value = "A wild Pokémon appeared!";
-      processPlayerMoves();
+      await processPlayerMoves();
     }
 
     // Preload player image
@@ -1084,38 +1356,32 @@ watch(
   },
   { deep: true, immediate: true }
 );
-
-onMounted(async () => {
-  // Initialize HP values correctly
-  playerCurrentHP.value = playerMaxHP.value;
-  opponentCurrentHP.value = opponentMaxHP.value;
-
-  // Set initial battle message
-  battleMessage.value = "A wild Pokémon appeared!";
-
-  // Process moves to ensure proper PP and typing
-  await processPlayerMoves();
-
-  // Handle auto-complete with result (for reviewing past battles)
-  if (props.initialResult && props.autoCompleteWithResult) {
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    battleMessage.value = "The battle is already over!";
-
-    if (props.initialResult === "player") {
-      opponentCurrentHP.value = 0;
-      opponentHealth.value = 0;
-    } else {
-      playerCurrentHP.value = 0;
-      playerHealth.value = 0;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    endBattle(props.initialResult);
-  }
-});
 </script>
 
 <style scoped>
+.bg-cream {
+  background-color: #f8f0d8;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20%,
+  60% {
+    transform: translateX(-5px);
+  }
+  40%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.3s;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

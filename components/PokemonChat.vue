@@ -101,14 +101,20 @@
           <div
             class="mt-4 text-center font-bold py-2 px-4 rounded"
             :class="
-              battleState.result === 'player'
+              message.battleData.result === 'player'
                 ? 'bg-green-100 text-green-800'
                 : 'bg-red-100 text-red-800'
             "
           >
             {{
-              battleState.result === "player"
+              message.battleData.result === "player"
                 ? (battleState.playerPokemon?.name || "Your Pokémon") + " won!"
+                : message.battleData.result === "capture"
+                ? "Gotcha! " +
+                  (battleState.opponentPokemon?.name || "The wild Pokémon") +
+                  " was caught!"
+                : message.battleData.result === "run"
+                ? "Got away safely!"
                 : (battleState.playerPokemon?.name || "Your Pokémon") +
                   " fainted!"
             }}
@@ -392,18 +398,47 @@ const handleMoveSelection = (move) => {
   // For example, add special effects for certain signature moves
 };
 
+const getBattleResultMessage = (result, state) => {
+  const playerName = state.playerPokemon?.name || "Your Pokémon";
+  const opponentName = state.opponentPokemon?.name || "the opponent";
+
+  if (result === "player") {
+    return `Victory! ${playerName} defeated ${opponentName}!`;
+  } else if (result === "capture") {
+    return `You caught ${opponentName}!`;
+  } else if (result === "run") {
+    return `Got away safely from ${opponentName}.`;
+  } else {
+    return `${playerName} was defeated by ${opponentName}.`;
+  }
+};
+
 // Handle battle completion
 const handleBattleClose = (result, stats) => {
-  console.log("Battle closed with result:", result);
+    console.log("Battle closed with result:", result);
 
-  // Hide the battle modal
-  showBattle.value = false;
+    // Hide the battle modal
+    showBattle.value = false;
 
-  // If no result was passed (just closing the window), don't process anything
-  if (!result) return;
+    // If no result was passed (just closing the window), don't process anything
+    if (!result) return;
 
-  // Save the battle stats
-  battleStats.value = stats || {};
+    // Save the battle stats
+    battleStats.value = stats || {};
+
+    // Update battleState with the final result
+    battleState.value.result = result;
+
+    // Add the battle result to the conversation
+    conversation.value.push({
+    role: "assistant",
+    content: getBattleResultMessage(result, battleState.value),
+    battleData: {
+        player: battleState.value.playerPokemon?.name,
+        opponent: battleState.value.opponentPokemon?.name,
+        result: result // This is the crucial line - battle results are passed
+    }
+    });
 
   // Process the battle results
   if (result) {
@@ -523,7 +558,7 @@ const extractBattleData = (responseData) => {
               opponent: args.opponentPokemon,
               playerLevel: getPokemonLevel(args.playerPokemon),
               opponentLevel: args.opponentLevel || getWildPokemonLevel(),
-              result: null
+              result: null,
             };
           } catch (e) {
             console.error("Error parsing battle arguments", e);
@@ -531,18 +566,20 @@ const extractBattleData = (responseData) => {
         }
       }
     }
-    
+
     // Add this check for the startingBattle flag
     if (responseData.gameState && responseData.gameState.startingBattle) {
       return {
         player: responseData.gameState.lastBattle.player,
         opponent: responseData.gameState.lastBattle.opponent,
         playerLevel: getPokemonLevel(responseData.gameState.lastBattle.player),
-        opponentLevel: responseData.gameState.lastBattle.opponentLevel || getWildPokemonLevel(),
-        result: null
+        opponentLevel:
+          responseData.gameState.lastBattle.opponentLevel ||
+          getWildPokemonLevel(),
+        result: null,
       };
     }
-    
+
     // Keep the existing check for reviewing past battles
     if (responseData.gameState && responseData.gameState.reviewingBattle) {
       return {
@@ -598,13 +635,13 @@ const sendMessage = async () => {
         role: "assistant",
         content: assistantMessage,
         pokemonData,
-        battleData,
+        battleData: battleData && battleData.result ? battleData : null,
       });
-      
+
       if (data.gameState) {
         localGameState.value = data.gameState;
         emit("update-game-state", data.gameState);
-        
+
         // Check for battle data from either tool_calls or gameState.startingBattle
         if (battleData) {
           console.log("Battle data found:", battleData);
@@ -614,11 +651,11 @@ const sendMessage = async () => {
               fetch(`/api/pokemon-info?name=${battleData.player}`),
               fetch(`/api/pokemon-info?name=${battleData.opponent}`),
             ]);
-            
+
             if (!playerPokemonResp.ok || !opponentPokemonResp.ok) {
               throw new Error("Failed to fetch Pokémon data for battle");
             }
-            
+
             const playerPokemonData = await playerPokemonResp.json();
             const opponentPokemonData = await opponentPokemonResp.json();
 
@@ -629,17 +666,18 @@ const sendMessage = async () => {
             battleState.value = {
               playerPokemon: playerPokemonData,
               opponentPokemon: opponentPokemonData,
-              playerLevel: battleData.playerLevel || getPokemonLevel(battleData.player),
+              playerLevel:
+                battleData.playerLevel || getPokemonLevel(battleData.player),
               opponentLevel: battleData.opponentLevel || getWildPokemonLevel(),
               // Only set result if it's from a previous battle that's being reviewed
               result: data.gameState.reviewingBattle ? battleData.result : null,
             };
-            
+
             console.log("Battle state prepared:", battleState.value);
-            
+
             // Show battle UI
             showBattle.value = true;
-            
+
             // Reset the startingBattle flag to prevent showing the battle again
             if (data.gameState.startingBattle) {
               data.gameState.startingBattle = false;
@@ -650,7 +688,8 @@ const sendMessage = async () => {
             console.error("Error preparing battle:", error);
             conversation.value.push({
               role: "assistant",
-              content: "There was an error preparing the battle. Please try again.",
+              content:
+                "There was an error preparing the battle. Please try again.",
             });
           }
         }
